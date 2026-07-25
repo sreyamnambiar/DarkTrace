@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Routes, Route, NavLink, useLocation, Navigate, useNavigate } from "react-router-dom";
 import type { AppState, BootstrapResponse } from "./types";
 import Dashboard from "./Dashboard";
@@ -54,11 +54,215 @@ const NAV_ITEMS = [
   { path: "/settings", label: "Settings", icon: <IconSettings /> },
 ];
 
+// ---- MainLayout is defined OUTSIDE App to prevent remounting on every App re-render ----
+interface MainLayoutProps {
+  user: { id: string; name: string; email: string } | null;
+  state: AppState | null;
+  showNotif: boolean;
+  setShowNotif: (v: boolean) => void;
+  notifRef: React.RefObject<HTMLDivElement>;
+  showProfile: boolean;
+  setShowProfile: (v: boolean) => void;
+  profileRef: React.RefObject<HTMLDivElement>;
+  toggleTheme: () => void;
+  handleLogout: () => void;
+  fetchState: () => void;
+  navigate: ReturnType<typeof useNavigate>;
+}
+
+function MainLayout({
+  user,
+  state,
+  showNotif,
+  setShowNotif,
+  notifRef,
+  showProfile,
+  setShowProfile,
+  profileRef,
+  toggleTheme,
+  handleLogout,
+  fetchState,
+  navigate,
+}: MainLayoutProps) {
+  const location = useLocation();
+
+  if (!user) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  const currentRouteInfo = PAGE_TITLES[location.pathname] || PAGE_TITLES["/dashboard"];
+
+  return (
+    <div className="app-shell">
+      {/* ---- SIDEBAR ---- */}
+      <aside className="sidebar">
+        <div className="sidebar-logo">
+          <div className="sidebar-logo-icon">
+            <IconShield />
+          </div>
+          <div className="sidebar-logo-text">
+            <span className="sidebar-logo-title">DarkTrace</span>
+            <span className="sidebar-logo-sub">Cybersecurity Intelligence</span>
+          </div>
+        </div>
+
+        <nav className="sidebar-nav">
+          {NAV_ITEMS.map((item, idx) => (
+            <div key={idx}>
+              <NavLink
+                to={item.path}
+                className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
+              >
+                <span className="nav-icon">{item.icon}</span>
+                {item.label}
+              </NavLink>
+            </div>
+          ))}
+        </nav>
+
+        <div style={{ marginTop: "auto" }}></div>
+      </aside>
+
+      {/* ---- MAIN AREA ---- */}
+      <div className="main-area">
+        <header className="topbar">
+          <div className="topbar-title-group">
+            <h1 className="topbar-title">{currentRouteInfo.title}</h1>
+            <p className="topbar-subtitle">{currentRouteInfo.subtitle}</p>
+          </div>
+
+          <div className="topbar-search">
+            <IconSearch />
+            <input placeholder="Search anything..." />
+          </div>
+
+          <div className="topbar-actions">
+            <div className="notif-wrapper" ref={notifRef}>
+              <button
+                className="topbar-icon-btn"
+                title="Notifications"
+                onClick={() => setShowNotif(!showNotif)}
+              >
+                <IconBell />
+                {(state?.summary?.phishingDetected ?? 0) > 0 && <span className="notif-dot" />}
+              </button>
+
+              {showNotif && (
+                <div className="notif-dropdown">
+                  <div className="notif-header">
+                    <span className="notif-title">Notifications</span>
+                    <button className="notif-clear-btn" onClick={() => setShowNotif(false)}>Mark all as read</button>
+                  </div>
+                  <div className="notif-body">
+                    <div className="notif-item unread">
+                      <div className="notif-icon critical"><IconAlertTriangle /></div>
+                      <div className="notif-content">
+                        <p className="notif-heading">Threat detected</p>
+                        <p className="notif-desc">High risk phishing URL blocked</p>
+                        <p className="notif-time">2 mins ago</p>
+                      </div>
+                    </div>
+                    <div className="notif-item">
+                      <div className="notif-icon warning"><IconMail /></div>
+                      <div className="notif-content">
+                        <p className="notif-heading">Email flagged</p>
+                        <p className="notif-desc">Suspicious sender detected in inbox</p>
+                        <p className="notif-time">1 hour ago</p>
+                      </div>
+                    </div>
+                    <div className="notif-item">
+                      <div className="notif-icon success"><IconShield /></div>
+                      <div className="notif-content">
+                        <p className="notif-heading">Recent scan completed</p>
+                        <p className="notif-desc">System check finished with 0 errors</p>
+                        <p className="notif-time">3 hours ago</p>
+                      </div>
+                    </div>
+                    <div className="notif-item">
+                      <div className="notif-icon info"><IconBarChart /></div>
+                      <div className="notif-content">
+                        <p className="notif-heading">New report generated</p>
+                        <p className="notif-desc">Weekly security summary available</p>
+                        <p className="notif-time">Yesterday</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="notif-footer">
+                    <button className="notif-view-all">View all notifications</button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button className="topbar-icon-btn" title="Theme Toggle" onClick={toggleTheme}>
+              <IconMoon />
+            </button>
+            
+            <div className="notif-wrapper" ref={profileRef}>
+              <button 
+                className="topbar-icon-btn profile-btn"
+                onClick={() => setShowProfile(!showProfile)}
+                style={{ borderRadius: "50%", padding: 0, overflow: "hidden", border: "2px solid var(--border)", width: "32px", height: "32px" }}
+              >
+                <img 
+                  src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`} 
+                  alt="Profile" 
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                />
+              </button>
+
+              {showProfile && (
+                <div className={`profile-dropdown ${showProfile ? 'show' : ''}`}>
+                  <div className="profile-dropdown-header">
+                    <img
+                      src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`}
+                      className="profile-dropdown-avatar"
+                      alt="Avatar"
+                    />
+                    <div className="profile-dropdown-info">
+                      <p className="profile-dropdown-name">{user.name}</p>
+                      <p className="profile-dropdown-email">{user.email}</p>
+                    </div>
+                  </div>
+                  <div className="profile-dropdown-body">
+                    <button className="profile-dropdown-item" onClick={() => { setShowProfile(false); navigate("/profile"); }}>
+                      <span role="img" aria-label="edit">✏️</span> Edit Profile
+                    </button>
+                    <button className="profile-dropdown-item logout" onClick={handleLogout}>
+                      <span role="img" aria-label="logout">🚪</span> Logout
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+          </div>
+        </header>
+
+        <div className="page-content">
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/url-scanner" element={<UrlScanner onStateUpdate={fetchState} />} />
+            <Route path="/email-scanner" element={<EmailScanner onStateUpdate={fetchState} />} />
+            <Route path="/history" element={<History />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/threat-intelligence" element={<ThreatIntelligence />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/extension" element={<ExtensionCenter />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const navigate = useNavigate();
   const [state, setState] = useState<AppState | null>(null);
   const [loading, setLoading] = useState(true);
-  const location = useLocation();
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
   const [showNotif, setShowNotif] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -68,14 +272,21 @@ function App() {
   const profileRef = useRef<HTMLDivElement>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
+  // Use a ref to always have the latest user value inside the polling interval
+  // without adding user to the interval's dependency array (which would restart the timer)
+  const userRef = useRef(user);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     setTheme(prev => prev === "light" ? "dark" : "light");
-  };
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -90,7 +301,7 @@ function App() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) {
       setUser(null);
@@ -106,16 +317,16 @@ function App() {
     } finally {
       setAuthLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     checkAuth();
     const handleAuthChange = () => checkAuth();
     window.addEventListener("auth-change", handleAuthChange);
     return () => window.removeEventListener("auth-change", handleAuthChange);
-  }, []);
+  }, [checkAuth]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try {
       await requestJson("/api/logout", { method: "POST" });
     } catch (e) {
@@ -125,17 +336,19 @@ function App() {
     setUser(null);
     setShowProfile(false);
     navigate("/login", { replace: true });
-  };
+  }, [navigate]);
 
-  const fetchState = async () => {
-    if (!user) return;
+  // fetchState uses userRef so it always reads the current user without being
+  // recreated on every render, which would restart the polling interval
+  const fetchState = useCallback(async () => {
+    if (!userRef.current) return;
     try {
       const latest = await requestJson<AppState>("/api/state");
       setState(latest);
     } catch {
       console.error("Backend polling failed.");
     }
-  };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -160,7 +373,7 @@ function App() {
       mounted = false;
       window.clearInterval(poll);
     };
-  }, [user]);
+  }, [user, fetchState]);
 
   if (authLoading || (loading && user)) {
     return (
@@ -173,186 +386,29 @@ function App() {
     );
   }
 
-  // Define the main layout
-  const MainLayout = () => {
-    if (!user) {
-      return <Navigate to="/login" replace state={{ from: location }} />;
-    }
-
-    const currentRouteInfo = PAGE_TITLES[location.pathname] || PAGE_TITLES["/dashboard"];
-    
-    return (
-      <div className="app-shell">
-        {/* ---- SIDEBAR ---- */}
-        <aside className="sidebar">
-          <div className="sidebar-logo">
-            <div className="sidebar-logo-icon">
-              <IconShield />
-            </div>
-            <div className="sidebar-logo-text">
-              <span className="sidebar-logo-title">DarkTrace</span>
-              <span className="sidebar-logo-sub">Cybersecurity Intelligence</span>
-            </div>
-          </div>
-
-          <nav className="sidebar-nav">
-            {NAV_ITEMS.map((item, idx) => (
-              <div key={idx}>
-                <NavLink
-                  to={item.path}
-                  className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
-                >
-                  <span className="nav-icon">{item.icon}</span>
-                  {item.label}
-                </NavLink>
-              </div>
-            ))}
-          </nav>
-
-          <div style={{ marginTop: "auto" }}></div>
-        </aside>
-
-        {/* ---- MAIN AREA ---- */}
-        <div className="main-area">
-          <header className="topbar">
-            <div className="topbar-title-group">
-              <h1 className="topbar-title">{currentRouteInfo.title}</h1>
-              <p className="topbar-subtitle">{currentRouteInfo.subtitle}</p>
-            </div>
-
-            <div className="topbar-search">
-              <IconSearch />
-              <input placeholder="Search anything..." />
-            </div>
-
-            <div className="topbar-actions">
-              <div className="notif-wrapper" ref={notifRef}>
-                <button
-                  className="topbar-icon-btn"
-                  title="Notifications"
-                  onClick={() => setShowNotif(!showNotif)}
-                >
-                  <IconBell />
-                  {(state?.summary?.phishingDetected ?? 0) > 0 && <span className="notif-dot" />}
-                </button>
-
-                {showNotif && (
-                  <div className="notif-dropdown">
-                    <div className="notif-header">
-                      <span className="notif-title">Notifications</span>
-                      <button className="notif-clear-btn" onClick={() => setShowNotif(false)}>Mark all as read</button>
-                    </div>
-                    <div className="notif-body">
-                      <div className="notif-item unread">
-                        <div className="notif-icon critical"><IconAlertTriangle /></div>
-                        <div className="notif-content">
-                          <p className="notif-heading">Threat detected</p>
-                          <p className="notif-desc">High risk phishing URL blocked</p>
-                          <p className="notif-time">2 mins ago</p>
-                        </div>
-                      </div>
-                      <div className="notif-item">
-                        <div className="notif-icon warning"><IconMail /></div>
-                        <div className="notif-content">
-                          <p className="notif-heading">Email flagged</p>
-                          <p className="notif-desc">Suspicious sender detected in inbox</p>
-                          <p className="notif-time">1 hour ago</p>
-                        </div>
-                      </div>
-                      <div className="notif-item">
-                        <div className="notif-icon success"><IconShield /></div>
-                        <div className="notif-content">
-                          <p className="notif-heading">Recent scan completed</p>
-                          <p className="notif-desc">System check finished with 0 errors</p>
-                          <p className="notif-time">3 hours ago</p>
-                        </div>
-                      </div>
-                      <div className="notif-item">
-                        <div className="notif-icon info"><IconBarChart /></div>
-                        <div className="notif-content">
-                          <p className="notif-heading">New report generated</p>
-                          <p className="notif-desc">Weekly security summary available</p>
-                          <p className="notif-time">Yesterday</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="notif-footer">
-                      <button className="notif-view-all">View all notifications</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <button className="topbar-icon-btn" title="Theme Toggle" onClick={toggleTheme}>
-                <IconMoon />
-              </button>
-              
-              <div className="notif-wrapper" ref={profileRef}>
-                <button 
-                  className="topbar-icon-btn profile-btn"
-                  onClick={() => setShowProfile(!showProfile)}
-                  style={{ borderRadius: "50%", padding: 0, overflow: "hidden", border: "2px solid var(--border)", width: "32px", height: "32px" }}
-                >
-                  <img 
-                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`} 
-                    alt="Profile" 
-                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                  />
-                </button>
-
-                {showProfile && (
-                  <div className={`profile-dropdown ${showProfile ? 'show' : ''}`}>
-                    <div className="profile-dropdown-header">
-                      <img
-                        src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`}
-                        className="profile-dropdown-avatar"
-                        alt="Avatar"
-                      />
-                      <div className="profile-dropdown-info">
-                        <p className="profile-dropdown-name">{user.name}</p>
-                        <p className="profile-dropdown-email">{user.email}</p>
-                      </div>
-                    </div>
-                    <div className="profile-dropdown-body">
-                      <button className="profile-dropdown-item" onClick={() => { setShowProfile(false); navigate("/profile"); }}>
-                        <span role="img" aria-label="edit">✏️</span> Edit Profile
-                      </button>
-                      <button className="profile-dropdown-item logout" onClick={handleLogout}>
-                        <span role="img" aria-label="logout">🚪</span> Logout
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-            </div>
-          </header>
-
-          <div className="page-content">
-            <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/url-scanner" element={<UrlScanner onStateUpdate={fetchState} />} />
-              <Route path="/email-scanner" element={<EmailScanner onStateUpdate={fetchState} />} />
-              <Route path="/history" element={<History />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/threat-intelligence" element={<ThreatIntelligence />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/extension" element={<ExtensionCenter />} />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
       <Route path="/signup" element={user ? <Navigate to="/dashboard" replace /> : <Signup />} />
-      <Route path="/*" element={<MainLayout />} />
+      <Route
+        path="/*"
+        element={
+          <MainLayout
+            user={user}
+            state={state}
+            showNotif={showNotif}
+            setShowNotif={setShowNotif}
+            notifRef={notifRef}
+            showProfile={showProfile}
+            setShowProfile={setShowProfile}
+            profileRef={profileRef}
+            toggleTheme={toggleTheme}
+            handleLogout={handleLogout}
+            fetchState={fetchState}
+            navigate={navigate}
+          />
+        }
+      />
     </Routes>
   );
 }

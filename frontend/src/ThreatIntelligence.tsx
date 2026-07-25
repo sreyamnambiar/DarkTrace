@@ -10,6 +10,7 @@ const MOCK_FEEDS = [
 
 export default function ThreatIntelligence() {
   const [activeFeeds, setActiveFeeds] = useState(MOCK_FEEDS);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -21,6 +22,18 @@ export default function ThreatIntelligence() {
     }, 3000);
     return () => clearTimeout(timer);
   }, []);
+
+  const handleSyncAll = () => {
+    if (syncing) return;
+    setSyncing(true);
+    // Mark all feeds as syncing
+    setActiveFeeds(MOCK_FEEDS.map(f => ({ ...f, status: "Syncing...", latency: "-", lastSync: "In progress" })));
+    // After 2s, restore connected state
+    setTimeout(() => {
+      setActiveFeeds(MOCK_FEEDS.map(f => ({ ...f, status: "Connected", lastSync: "Just now" })));
+      setSyncing(false);
+    }, 2000);
+  };
 
   return (
     <div className="page-wrapper" style={{ maxWidth: "1000px", margin: "0 auto" }}>
@@ -51,8 +64,8 @@ export default function ThreatIntelligence() {
       <div className="table-card">
         <div className="table-card-header">
           <p className="table-card-title">Connected Intelligence Feeds</p>
-          <button className="table-filter-btn" onClick={() => window.location.reload()}>
-            Sync All Feeds
+          <button className="table-filter-btn" onClick={handleSyncAll} disabled={syncing}>
+            {syncing ? "Syncing..." : "Sync All Feeds"}
           </button>
         </div>
         
