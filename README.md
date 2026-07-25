@@ -10,7 +10,7 @@ Phishing attacks remain one of the most prevalent and damaging vectors for cyber
 
 ---
 
-## Solution Overview
+## Solution 
 
 DarkTrace solves this by combining **Machine Learning (ML)** with **Heuristic Analysis**. Instead of relying purely on static blocklists, the platform dynamically analyzes the structural, behavioral, and contextual traits of incoming URLs and emails. By processing inputs through a lightweight Natural Language Processing (NLP) Bayesian classifier alongside deep heuristic checks (like WHOIS domain age, typosquatting detection, and external threat intelligence), DarkTrace delivers high-confidence threat detection with explainable AI feedback.
 
