@@ -13,7 +13,7 @@ let requests = [38, 43, 44, 52, 39, 41, 47, 50, 51, 34, 35, 44, 40, 52, 43, 36, 
 let threats = [0, 0, 1, 0, 1, 1, 2, 2, 1, 0, 1, 2, 1, 0, 1, 1, 0];
 let totalThreats = 3;
 let load = 82;
-let health = 94.2;
+let health = 94.20;
 
 const assets = [
   { name: "Main St Corridor", usage: 80 },
