@@ -301,12 +301,12 @@ function App() {
                 </button>
 
                 {showProfile && (
-                  <div className="profile-dropdown">
+                  <div className={`profile-dropdown ${showProfile ? 'show' : ''}`}>
                     <div className="profile-dropdown-header">
-                      <img 
+                      <img
                         src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`}
-                        className="profile-dropdown-avatar" 
-                        alt="Avatar" 
+                        className="profile-dropdown-avatar"
+                        alt="Avatar"
                       />
                       <div className="profile-dropdown-info">
                         <p className="profile-dropdown-name">{user.name}</p>
@@ -314,11 +314,12 @@ function App() {
                       </div>
                     </div>
                     <div className="profile-dropdown-body">
-                      <button className="profile-dropdown-item" onClick={() => { setShowProfile(false); navigate("/profile"); }}>Profile</button>
-                      <button className="profile-dropdown-item" onClick={() => { setShowProfile(false); navigate("/profile"); }}>Edit Profile</button>
-                      <button className="profile-dropdown-item" onClick={() => { setShowProfile(false); navigate("/settings"); }}>Settings</button>
-                      <button className="profile-dropdown-item" onClick={() => { setShowProfile(false); navigate("/profile"); }}>Change Password</button>
-                      <button className="profile-dropdown-item logout" onClick={handleLogout}>Logout</button>
+                      <button className="profile-dropdown-item" onClick={() => { setShowProfile(false); navigate("/profile"); }}>
+                        <span role="img" aria-label="edit">✏️</span> Edit Profile
+                      </button>
+                      <button className="profile-dropdown-item logout" onClick={handleLogout}>
+                        <span role="img" aria-label="logout">🚪</span> Logout
+                      </button>
                     </div>
                   </div>
                 )}
